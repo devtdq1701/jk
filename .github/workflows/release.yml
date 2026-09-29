@@ -44,9 +44,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.ref_name }}" = "main" ]; then
-            gh release create latest dist/* --title "Latest Build (main)" --notes "Automated rolling release from commit ${{ github.sha }}" --prerelease --clobber
+            gh release upload latest dist/* --clobber || \
+            gh release create latest dist/* --title "Latest Build (main)" --notes "Automated rolling release from commit ${{ github.sha }}" --prerelease
           elif [ "${{ github.event_name }}" = "release" ]; then
             gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber
           elif [[ "${{ github.ref_name }}" =~ ^v ]]; then
-            gh release create "${{ github.ref_name }}" dist/* --title "${{ github.ref_name }}" --generate-notes --clobber
+            gh release upload "${{ github.ref_name }}" dist/* --clobber || \
+            gh release create "${{ github.ref_name }}" dist/* --title "${{ github.ref_name }}" --generate-notes
           fi
