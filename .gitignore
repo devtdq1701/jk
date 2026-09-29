@@ -1,0 +1,21 @@
+# Binaries
+bin/
+/jk
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Logs & temp files
+*.log
+*.orig
+*.bak
+/tmp/
+
+# OS & Editor
+.DS_Store
+.idea/
+.vscode/
