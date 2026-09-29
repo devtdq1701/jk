@@ -13,6 +13,19 @@
 
 ## Installation
 
+### Pre-built Binaries (Linux & Windows)
+
+Download the latest pre-compiled binary from [GitHub Releases](https://github.com/devtdq1701/jk/releases/latest):
+
+- **Linux (x86_64)**: [`jk-linux-amd64`](https://github.com/devtdq1701/jk/releases/download/latest/jk-linux-amd64)
+- **Linux (ARM64)**: [`jk-linux-arm64`](https://github.com/devtdq1701/jk/releases/download/latest/jk-linux-arm64)
+- **Windows (x86_64)**: [`jk-windows-amd64.exe`](https://github.com/devtdq1701/jk/releases/download/latest/jk-windows-amd64.exe)
+
+#### Linux Quick Install:
+```bash
+curl -sSL -o ~/.local/bin/jk https://github.com/devtdq1701/jk/releases/download/latest/jk-linux-amd64 && chmod +x ~/.local/bin/jk
+```
+
 ### With Go (1.22+)
 
 ```bash
