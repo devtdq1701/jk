@@ -13,7 +13,6 @@ import (
 var (
 	configFileFlag string
 	stdinFlag      bool
-	buildParamFlag []string
 
 	jobCmd = &cobra.Command{
 		Use:   "job",
@@ -117,41 +116,6 @@ var (
 			return nil
 		},
 	}
-
-	buildCmd = &cobra.Command{
-		Use:   "build <job>",
-		Short: "Trigger a job build",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			client, err := getClient()
-			if err != nil {
-				return err
-			}
-
-			params := make(map[string]string)
-			for _, p := range buildParamFlag {
-				parts := strings.SplitN(p, "=", 2)
-				if len(parts) == 2 {
-					params[parts[0]] = parts[1]
-				}
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-
-			loc, err := client.BuildJob(ctx, args[0], params)
-			if err != nil {
-				return err
-			}
-
-			if loc != "" {
-				fmt.Printf("Build queued at: %s\n", loc)
-			} else {
-				fmt.Printf("Build triggered for job '%s'.\n", args[0])
-			}
-			return nil
-		},
-	}
 )
 
 func parseColor(c string) string {
@@ -177,13 +141,9 @@ func init() {
 	jobSetConfigCmd.Flags().StringVarP(&configFileFlag, "file", "f", "", "path to XML config file")
 	jobSetConfigCmd.Flags().BoolVar(&stdinFlag, "stdin", false, "read XML config from stdin")
 
-	buildCmd.Flags().StringArrayVarP(&buildParamFlag, "param", "p", nil, "build parameter in key=value format (repeatable)")
-
 	jobCmd.AddCommand(jobLsCmd)
 	jobCmd.AddCommand(jobGetConfigCmd)
 	jobCmd.AddCommand(jobSetConfigCmd)
-	jobCmd.AddCommand(buildCmd)
 
 	rootCmd.AddCommand(jobCmd)
-	rootCmd.AddCommand(buildCmd)
 }
