@@ -56,6 +56,27 @@ type StageItem struct {
 	PauseDurationMillis int64  `json:"pauseDurationMillis"`
 }
 
+type BuildItem struct {
+	Number    int    `json:"number"`
+	URL       string `json:"url"`
+	Result    string `json:"result,omitempty"`
+	Timestamp int64  `json:"timestamp,omitempty"`
+	Duration  int64  `json:"duration,omitempty"`
+}
+
+type BuildDetail struct {
+	Number     int               `json:"number"`
+	Result     string            `json:"result"`
+	Timestamp  int64             `json:"timestamp"`
+	Duration   int64             `json:"duration"`
+	Building   bool              `json:"building"`
+	URL        string            `json:"url"`
+	Causes     []string          `json:"causes"`
+	Parameters map[string]string `json:"parameters"`
+	GitCommit  string            `json:"git_commit,omitempty"`
+	GitBranch  string            `json:"git_branch,omitempty"`
+}
+
 func NewClient(rawURL, user, token string, timeout time.Duration, rps float64, burst int) (*Client, error) {
 	parsed, err := url.Parse(strings.TrimRight(rawURL, "/"))
 	if err != nil {
@@ -506,3 +527,112 @@ func (c *Client) StreamLog(ctx context.Context, jobPath, buildNo string, follow 
 
 	return nil
 }
+
+func (c *Client) GetBuilds(ctx context.Context, jobPath string, limit int) ([]BuildItem, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	endpoint := fmt.Sprintf("%s/api/json?tree=builds[number,url,result,timestamp,duration]{0,%d}", c.ResolveJobPath(jobPath), limit)
+	req, err := c.newAuthenticatedRequest(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get builds returned HTTP %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Builds []BuildItem `json:"builds"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("decode builds: %w", err)
+	}
+	return data.Builds, nil
+}
+
+func (c *Client) GetBuildInfo(ctx context.Context, jobPath, buildNo string) (*BuildDetail, error) {
+	target := strings.TrimSpace(buildNo)
+	if target == "" || strings.ToLower(target) == "last" {
+		target = "lastBuild"
+	}
+	endpoint := fmt.Sprintf("%s/%s/api/json", c.ResolveJobPath(jobPath), target)
+	req, err := c.newAuthenticatedRequest(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("get build info returned HTTP %d", resp.StatusCode)
+	}
+
+	var raw struct {
+		Number    int    `json:"number"`
+		Result    string `json:"result"`
+		Timestamp int64  `json:"timestamp"`
+		Duration  int64  `json:"duration"`
+		Building  bool   `json:"building"`
+		URL       string `json:"url"`
+		Actions   []struct {
+			Causes []struct {
+				ShortDescription string `json:"shortDescription"`
+			} `json:"causes"`
+			Parameters []struct {
+				Name  string      `json:"name"`
+				Value interface{} `json:"value"`
+			} `json:"parameters"`
+			LastBuiltRevision struct {
+				SHA1   string `json:"SHA1"`
+				Branch []struct {
+					Name string `json:"name"`
+				} `json:"branch"`
+			} `json:"lastBuiltRevision"`
+		} `json:"actions"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decode build info: %w", err)
+	}
+
+	detail := &BuildDetail{
+		Number:     raw.Number,
+		Result:     raw.Result,
+		Timestamp:  raw.Timestamp,
+		Duration:   raw.Duration,
+		Building:   raw.Building,
+		URL:        raw.URL,
+		Parameters: make(map[string]string),
+	}
+
+	for _, a := range raw.Actions {
+		for _, cause := range a.Causes {
+			if cause.ShortDescription != "" {
+				detail.Causes = append(detail.Causes, cause.ShortDescription)
+			}
+		}
+		for _, p := range a.Parameters {
+			if p.Name != "" {
+				detail.Parameters[p.Name] = fmt.Sprintf("%v", p.Value)
+			}
+		}
+		if a.LastBuiltRevision.SHA1 != "" && detail.GitCommit == "" {
+			detail.GitCommit = a.LastBuiltRevision.SHA1
+			if len(a.LastBuiltRevision.Branch) > 0 {
+				detail.GitBranch = a.LastBuiltRevision.Branch[0].Name
+			}
+		}
+	}
+
+	return detail, nil
+}
+

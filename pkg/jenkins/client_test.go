@@ -70,6 +70,46 @@ func TestMockJenkinsClient(t *testing.T) {
 				},
 			}
 			_ = json.NewEncoder(w).Encode(data)
+		case "/job/my-job/api/json":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"builds": [
+					{"number": 40, "url": "http://jenkins/job/my-job/40/", "result": "SUCCESS", "timestamp": 1600000000000, "duration": 84000},
+					{"number": 39, "url": "http://jenkins/job/my-job/39/", "result": "SUCCESS", "timestamp": 1599990000000, "duration": 78000}
+				]
+			}`))
+		case "/job/my-job/39/api/json":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"number": 39,
+				"result": "SUCCESS",
+				"timestamp": 1599990000000,
+				"duration": 78000,
+				"building": false,
+				"url": "http://jenkins/job/my-job/39/",
+				"actions": [
+					{
+						"causes": [
+							{"shortDescription": "Started by remote host 10.165.17.210"}
+						]
+					},
+					{
+						"parameters": [
+							{"name": "BRANCH", "value": "QLVB_TRAVINH_core"},
+							{"name": "COMMIT_ID", "value": "feb1b47c185e0c37ce21ef8c36d0637419b6b1ac"},
+							{"name": "ITKV", "value": "ITKV5"},
+							{"name": "TASKDEPLOY", "value": "IT360-1639280"}
+						]
+					},
+					{
+						"_class": "hudson.plugins.git.util.BuildData",
+						"lastBuiltRevision": {
+							"SHA1": "feb1b47c185e0c37ce21ef8c36d0637419b6b1ac",
+							"branch": [{"name": "origin/QLVB_TRAVINH_core"}]
+						}
+					}
+				]
+			}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -124,5 +164,29 @@ func TestMockJenkinsClient(t *testing.T) {
 	}
 	if len(stages) != 1 || stages[0].Name != "Build" {
 		t.Errorf("Unexpected stages: %+v", stages)
+	}
+
+	// 6. GetBuilds
+	builds, err := client.GetBuilds(ctx, "my-job", 10)
+	if err != nil {
+		t.Fatalf("GetBuilds failed: %v", err)
+	}
+	if len(builds) != 2 || builds[0].Number != 40 || builds[0].Result != "SUCCESS" {
+		t.Errorf("Unexpected builds: %+v", builds)
+	}
+
+	// 7. GetBuildInfo
+	info, err := client.GetBuildInfo(ctx, "my-job", "39")
+	if err != nil {
+		t.Fatalf("GetBuildInfo failed: %v", err)
+	}
+	if info.Number != 39 || info.Result != "SUCCESS" || info.Parameters["ITKV"] != "ITKV5" || info.Parameters["COMMIT_ID"] != "feb1b47c185e0c37ce21ef8c36d0637419b6b1ac" {
+		t.Errorf("Unexpected build info: %+v", info)
+	}
+	if len(info.Causes) != 1 || info.Causes[0] != "Started by remote host 10.165.17.210" {
+		t.Errorf("Unexpected causes: %+v", info.Causes)
+	}
+	if info.GitCommit != "feb1b47c185e0c37ce21ef8c36d0637419b6b1ac" || info.GitBranch != "origin/QLVB_TRAVINH_core" {
+		t.Errorf("Unexpected git info: commit=%s branch=%s", info.GitCommit, info.GitBranch)
 	}
 }
