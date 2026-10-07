@@ -88,11 +88,21 @@ jk job set-config my-job -f config.xml
 cat config.xml | jk job set-config my-job --stdin
 ```
 
-### 4. Build & Stage Logs
+### 4. Build Operations & History Inspection
 
 ```bash
 # Trigger a build (with optional parameters)
 jk build my-pipeline -p BRANCH=main -p ENV=staging
+
+# List recent builds with status and duration
+jk build ls my-pipeline
+jk build ls my-pipeline -n 20
+jk build ls my-pipeline --json
+
+# Inspect detailed build metadata (parameters, causes, duration, commit ID)
+jk build info my-pipeline           # defaults to latest build
+jk build info my-pipeline 39
+jk build info my-pipeline 39 --json
 
 # View console log (or follow live)
 jk log my-pipeline
